@@ -52,18 +52,18 @@ optional arguments:
   --version             show program's version number and exit
   ```
   
-  Dependencies
-  ------------
-  * lsdiff
-  * patch
-  * rpm-build
-  * gcc
-  * redhat-rpm-config
+Dependencies
+------------
+* lsdiff
+* patch
+* rpm-build
+* gcc
+* redhat-rpm-config
   
-  Build
-  -----
-  In your home dir create following dirs RPMS/ SOURCES/ SPECS/ SRPMS/  ( 'mkdir -p ~/{BUILD,RPMS,SOURCES,SPECS,SRPMS}' ) and clone the repo contents in SOURCES then run:
+Build
+-----
+In your home dir create following dirs RPMS/ SOURCES/ SPECS/ SRPMS/  ( 'mkdir -p ~/{BUILD,RPMS,SOURCES,SPECS,SRPMS}' ) and clone the repo contents in SOURCES then run:
   
-  ```
-  rpmbuild -ba ./SOURCES/SPECS/*.spec
-  ```
+```
+rpmbuild -ba ./SOURCES/SPECS/*.spec
+```
