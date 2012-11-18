@@ -1,0 +1,114 @@
+--- /opt/zenoss/bin/zenossdbpack        2012-10-04 15:06:12.000000000 +0100
++++ /opt/zenoss/bin/zenossdbpack        2012-11-09 14:44:56.000000000 +0000
+@@ -1,17 +1,62 @@
+ #!/opt/zenoss/bin/python
++
++##
++## THIS IS EXCLUSIVELY FOR ZENOSS 4.1.1
++##
++
+ import sys
++from os import path
+ import tempfile
+ import optparse
+ import subprocess
++import os
+
+ import Globals
+ from Products.ZenUtils.Utils import zenPath
+ from Products.ZenUtils.GlobalConfig import getGlobalConfiguration
++import Zope2.Startup
++import ZConfig
++
+
+-CONFIG = """
++def getSchema():
++    startup = os.path.dirname(os.path.realpath(Zope2.Startup.__file__))
++    schemafile = os.path.join(startup, 'zopeschema.xml')
++    return ZConfig.loadSchema(schemafile)
++
++def get_config(zodb=None):
++    _global_conf = getGlobalConfiguration()
++    if zodb:
++        try:
++            cfg = ZConfig.loadConfigFile(getSchema(), \
++                              open(zenPath('etc','zope.conf')))
++            sv = cfg[0]
++        except Exception, e:
++            print str(e)
++            sys.exit(1)
++
++        db = [x for x in sv.databases if x.getName() == zodb]
++        if not db:
++            print "There is no zodb by name %s" % zodb
++            sys.exit(1)
++
++        dbconfig = db[0].config.storage.config.adapter.config
++        if dbconfig.unix_socket:
++            _global_conf['mysqlsocket'] = dbconfig.unix_socket
++        _global_conf['host'] = dbconfig.host
++        _global_conf['port'] = dbconfig.port
++        _global_conf['mysqldb'] = dbconfig.db
++        _global_conf['mysqluser'] = dbconfig.user
++        _global_conf['mysqlpasswd'] = dbconfig.passwd
++
++    zodb_socket = _global_conf.get('mysqlsocket')
++    if zodb_socket:
++        _global_conf['socket-option'] = 'unix_socket %s' % zodb_socket
++    else:
++        _global_conf['socket-option'] = ''
++
++    config = """
+ <relstorage>
+     pack-gc true
+-    pack-duty-cycle 0.9
+     keep-history false
+     <mysql>
+         host %(host)s
+@@ -19,24 +64,38 @@
+         db %(mysqldb)s
+         user %(mysqluser)s
+         passwd %(mysqlpasswd)s
++        %(socket-option)s
+     </mysql>
+ </relstorage>
+-""" % getGlobalConfiguration()
++""" % _global_conf
++    return config
+
+-if __name__=="__main__":
++def pack_database(config):
++    """
++    Write the config file and call zodbpack
++    """
++    with tempfile.NamedTemporaryFile() as configfile:
++        configfile.write(config)
++        configfile.flush()
++        cmd = [zenPath('bin', 'zodbpack'), configfile.name, '-d', options.days]
++        return subprocess.call(cmd)
++
++if __name__ == "__main__":
+     # Get the days option to forward to zodbpack
+     parser = optparse.OptionParser(description=__doc__,
+         usage="%prog [options]")
+-    parser.add_option( "-d", "--days", dest="days", default="0",
++    parser.add_option("-d", "--days", dest="days", default="0",
+                       help="Days of history to keep (default 0)")
++    parser.add_option("-s", "--no-zodb", dest="nozodb", default=0, action='store_true',
++                      help="Only compress session database, but not the zodb")
+     options, args = parser.parse_args(sys.argv[1:])
+
+     retcode = 1
++    # pack the main database
++    if not options.nozodb:
++        retcode = pack_database(get_config('main'))
+
+-    # Write the config file and call zodbpack
+-    with tempfile.NamedTemporaryFile() as configfile:
+-        configfile.write(CONFIG)
+-        cmd = [zenPath('bin', 'zodbpack'), configfile.name, '-d', options.days]
+-        retcode = subprocess.call(cmd)
++    # pack the session database
++    retcode = max(retcode, pack_database(get_config('temporary')))
+
+     sys.exit(retcode)

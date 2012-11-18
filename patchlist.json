@@ -1,0 +1,8 @@
+{
+    "zenossdbpack_session_zodb.patch": {
+        "patchPriority": 1,
+        "baseDir": "/opt/zenoss",
+        "patchLevel": 3,
+        "description": "zodb_session DB packer that cleans it weekly."
+    },
+}
